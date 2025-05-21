@@ -1,6 +1,5 @@
 # SmartFilter-API
 API for filtering and matching molecules using SMARTS patterns.
-Supports multiple SMARTS patterns via `/get_filterpains`, `/get_matchcounts`, `/get_matchFilter`, `/get_multi_matchcounts` and `/get_multi_matchfilter` endpoints.
 This repo is under active development.
 
 ## Requirements
