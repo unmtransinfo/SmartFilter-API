@@ -1,0 +1,261 @@
+info:
+  title: API for SMARTS FILTER
+  description: |
+    Endpoints for SMARTS‑based filtering.
+  version: 1
+basePath: /api/v1
+
+components:
+  schemas:
+    painsentry:
+      type: object
+
+  parameters:
+    SMILESList:
+      name: SMILES
+      in: query
+      type: array
+      items:
+        type: string
+      required: true
+      description: List of compound SMILES
+    exclude_mol_props:
+      name: ExcludeMolProp
+      in: query
+      type: boolean
+      required: false
+      description: Exclude Molecular Properties
+    Smarts:
+      name: smarts
+      in: query
+      required: true
+      schema:
+        type: array
+        items:
+          type: string
+      style: form
+      explode: true
+      description: Takes one or more SMARTS strings (comma-separated or repeated).
+
+    usa:
+      name: Unique Set-of-Atoms
+      in: query
+      type: boolean
+      required: false
+      description: Unique Set-of-Atoms Match Counts
+    nonzero_rows:
+      name: Only Include Rows
+      in: query
+      type: boolean
+      required: false
+      description: only include rows (ie molecules) with at least one match in output
+    strict:
+      name: Raise Error
+      in: query
+      type: boolean
+      required: false
+      description: raise error if any SMARTS cannot be parsed. If not set, will ignore invalid SMARTS.
+    delim:
+      name: Delimeter
+      in: query
+      type: string
+      required: false
+      description: Include delimeter in smiles
+    smiles_column:
+      name: Smiles_Col
+      in: query
+      type: integer
+      required: false
+      description: Smiles's Column Index
+    name_column:
+      name: Names_Col
+      in: query
+      type: integer
+      required: false
+      description: Smiles's Name Index
+  responses:
+    ResponseCode400:
+      description: Malformed request error
+paths:
+  /smarts_filter/get_filterpains:
+    get:
+      tags:
+        - SMARTS FILTER
+      summary: Get the smiles string with their bool values.
+      description: Checks if the input Smiles have passed or failed the PAINS Test.
+      parameters:
+        - $ref: '#/components/parameters/SMILESList'
+        - $ref: '#/components/parameters/exclude_mol_props'
+      responses:
+        200:
+          description: A JSON object containing all compounds and their associated tests either passed or failed.
+          examples:
+            application/json:
+              {
+                "failed": [
+                  "O=C1NC(=O)C(=Cc2ccc(C=C3C(=O)NC(=O)NC3=O)cc2)C(=O)N1"
+                ],
+                "passed": [
+                  "COc1cc2c(ccnc2cc1)C(O)C4CC(CC3)C(C=C)CN34"
+                ]
+              }
+            
+        400:
+          $ref: '#/components/responses/ResponseCode400'
+      
+  /smarts_filter/get_matchcounts:
+    get:
+      tags:
+        - SMARTS FILTER
+      summary: Get the smiles string with their bool values.
+      description: Checks if the input Smiles have passed or failed the PAINS Test.
+      parameters:
+        - $ref: '#/components/parameters/SMILESList'
+        - $ref: '#/components/parameters/Smarts'
+        - $ref: '#/components/parameters/usa'
+        - $ref: '#/components/parameters/delim'
+        - $ref: '#/components/parameters/exclude_mol_props'
+        - $ref: '#/components/parameters/smiles_column'
+        - $ref: '#/components/parameters/name_column'
+
+      responses:
+        200:
+          description: A JSON object containing all compounds and their associated tests either passed or failed.
+          examples:
+            application/json:
+              [
+                {
+                  "n_matches": 1,
+                  "name": "quinine",
+                  "smiles": "C=CC1CN2CCC1CC2C(O)c1ccnc2ccc(OC)cc12"
+                },
+                {
+                  "n_matches": 0,
+                  "name": "caffeine",
+                  "smiles": "Cn1c(=O)c2c(ncn2C)n(C)c1=O"
+                },
+                {
+                  "n_matches": 4,
+                  "name": "GL-1566",
+                  "smiles": "O=C(O)c1nnn(C2COC3C2OCC3n2nnc(C(=O)O)c2C(=O)O)c1C(=O)O"
+                }
+              ]
+            
+        400:
+          $ref: '#/components/responses/ResponseCode400'
+        
+  /smarts_filter/get_matchFilter:
+    get:
+      tags:
+        - SMARTS FILTER
+      summary: Get the matched smiles string with their corresponding name if given.
+      description: Matched SMILES.
+      parameters:
+        - $ref: '#/components/parameters/SMILESList'
+        - $ref: '#/components/parameters/Smarts'
+        - $ref: '#/components/parameters/delim'
+        - $ref: '#/components/parameters/exclude_mol_props'
+        - $ref: '#/components/parameters/smiles_column'
+        - $ref: '#/components/parameters/name_column'
+      responses:
+        200:
+          description: A JSON object containing all compounds and their associated tests either passed or failed.
+          examples:
+            application/json:
+              example:
+                [
+                  {
+                    "SMILES": "OC(c1ccccc1)c1nc2ccccc2[nH]1",
+                    "name": "NSC-405"
+                  },
+                  {
+                    "SMILES": "O=C(O)c1nc(-c2ccccc2)[nH]c1C(=O)O",
+                    "name": "NSC-4623"
+                  },
+                  {
+                    "SMILES": "O=C(O)c1nc(N=Nc2ccc(S(=O)(=O)O)cc2)[nH]c1C(=O)O",
+                    "name": "NSC-4624"
+                  }
+                ]
+            
+        400:
+          $ref: '#/components/responses/ResponseCode400'
+
+  /smarts_filter/get_multi_matchcounts:
+      get:
+        tags:
+          - SMARTS FILTER
+        summary: Get SMARTS pattern match counts for input SMILES.
+        description: For each input SMILES, compute how many times each SMARTS pattern matches (multi-match counting). Useful for filtering compounds with PAINS or other substructure rules.
+        parameters:
+          - $ref: '#/components/parameters/SMILESList'
+          - $ref: '#/components/parameters/Smarts'
+          - $ref: '#/components/parameters/usa'
+          - $ref: '#/components/parameters/strict'
+          - $ref: '#/components/parameters/delim'
+          - $ref: '#/components/parameters/nonzero_rows'
+          - $ref: '#/components/parameters/exclude_mol_props'
+          - $ref: '#/components/parameters/smiles_column'
+          - $ref: '#/components/parameters/name_column'
+        responses:
+          200:
+            description: A JSON object containing all compounds and their associated tests either passed or failed.
+            examples:
+              application/json:
+                [
+                  {
+                    "n_matches": 1,
+                    "name": "quinine",
+                    "smiles": "C=CC1CN2CCC1CC2C(O)c1ccnc2ccc(OC)cc12"
+                  },
+                  {
+                    "n_matches": 0,
+                    "name": "caffeine",
+                    "smiles": "Cn1c(=O)c2c(ncn2C)n(C)c1=O"
+                  },
+                  {
+                    "n_matches": 4,
+                    "name": "GL-1566",
+                    "smiles": "O=C(O)c1nnn(C2COC3C2OCC3n2nnc(C(=O)O)c2C(=O)O)c1C(=O)O"
+                  }
+                ]
+              
+          400:
+            $ref: '#/components/responses/ResponseCode400'
+
+  /smarts_filter/get_multi_matchfilter:
+    get:
+      tags:
+        - SMARTS FILTER
+      summary: Get the matched SMILES strings with their corresponding names, if provided.
+      description: Returns a list of SMILES strings that match the given SMARTS pattern(s), along with optional names.
+      parameters:
+        - $ref: '#/components/parameters/SMILESList'
+        - $ref: '#/components/parameters/Smarts'
+        - $ref: '#/components/parameters/strict'
+        - $ref: '#/components/parameters/delim'
+        - $ref: '#/components/parameters/exclude_mol_props'
+        - $ref: '#/components/parameters/smiles_column'
+        - $ref: '#/components/parameters/name_column'
+      responses:
+        200:
+          description: A JSON array of matched compounds with their SMILES and optional names.
+          examples:
+            application/json:
+              example:
+                [
+                  {
+                    "SMILES": "OC(c1ccccc1)c1nc2ccccc2[nH]1",
+                    "name": "NSC-405"
+                  },
+                  {
+                    "SMILES": "O=C(O)c1nc(-c2ccccc2)[nH]c1C(=O)O",
+                    "name": "NSC-4623"
+                  },
+                  {
+                    "SMILES": "O=C(O)c1nc(N=Nc2ccc(S(=O)(=O)O)cc2)[nH]c1C(=O)O",
+                    "name": "NSC-4624"
+                  }
+                ]
+        400:
+          $ref: '#/components/responses/ResponseCode400'
