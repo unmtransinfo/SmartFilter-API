@@ -4,6 +4,7 @@ from config import Config
 from models import db
 from flasgger import LazyJSONEncoder, Swagger
 from flask import Flask
+from flask_cors import CORS
 
 def _load_api_spec() -> dict:
     with open("swagger_template.yml", "r") as file:
@@ -52,6 +53,7 @@ def create_app():
 
 
 app = create_app()
+CORS(app)
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=app.config.get("APP_PORT"), debug=True)
