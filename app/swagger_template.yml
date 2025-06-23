@@ -20,12 +20,22 @@ components:
       required: true
       description: List of compound SMILES
 
-    Name:
-      name: Names
+    SmileName:
+      name: Smile_Names
       in: query
       type: array
       items:
         type: string
+      required: false
+      description: List of compound names
+
+    SmartName:
+      name: Smart_Names
+      in: query
+      type: array
+      items:
+        type: string
+      collectionFormat: multi
       required: false
       description: List of compound names
 
@@ -42,6 +52,7 @@ components:
       type: array
       items:
         type: string
+      collectionFormat: multi
       required: true
       style: form
       explode: true
@@ -81,7 +92,7 @@ paths:
       description: Checks if the input SMILES have passed or failed the PAINS Test.
       parameters:
         - $ref: '#/components/parameters/SMILESList'
-        - $ref: '#/components/parameters/Name'
+        - $ref: '#/components/parameters/SmileName'
         - $ref: '#/components/parameters/exclude_mol_props'
       responses:
         200:
@@ -103,8 +114,9 @@ paths:
       description: Checks SMARTS pattern match counts for each input SMILES.
       parameters:
         - $ref: '#/components/parameters/SMILESList'
-        - $ref: '#/components/parameters/Name'
+        - $ref: '#/components/parameters/SmileName'
         - $ref: '#/components/parameters/Smarts'
+        - $ref: '#/components/parameters/SmartName'
         - $ref: '#/components/parameters/usa'
         - $ref: '#/components/parameters/exclude_mol_props'
       responses:
@@ -135,25 +147,24 @@ paths:
       description: Returns matched SMILES (and names if provided) that pass SMARTS filtering.
       parameters:
         - $ref: '#/components/parameters/SMILESList'
-        - $ref: '#/components/parameters/Name'
+        - $ref: '#/components/parameters/SmileName'
         - $ref: '#/components/parameters/Smarts'
+        - $ref: '#/components/parameters/SmartName'
         - $ref: '#/components/parameters/exclude_mol_props'
       responses:
         200:
-          description: List of SMILES and names matching the SMARTS.
+          description: List of each SMILES and names matching the multi SMARTS.
           examples:
             application/json:
               example:
-                [
+                {
+                "example": [
                   {
                     "SMILES": "OC(c1ccccc1)c1nc2ccccc2[nH]1",
                     "name": "NSC-405"
-                  },
-                  {
-                    "SMILES": "O=C(O)c1nc(-c2ccccc2)[nH]c1C(=O)O",
-                    "name": "NSC-4623"
                   }
                 ]
+              }
         400:
           $ref: '#/components/responses/ResponseCode400'
 
@@ -165,8 +176,9 @@ paths:
       description: For each SMILES, compute how many SMARTS patterns match (multi-match counting).
       parameters:
         - $ref: '#/components/parameters/SMILESList'
-        - $ref: '#/components/parameters/Name'
+        - $ref: '#/components/parameters/SmileName'
         - $ref: '#/components/parameters/Smarts'
+        - $ref: '#/components/parameters/SmartName'
         - $ref: '#/components/parameters/usa'
         - $ref: '#/components/parameters/strict'
         - $ref: '#/components/parameters/nonzero_rows'
@@ -194,8 +206,9 @@ paths:
       description: Returns SMILES strings that match any of the given SMARTS patterns, with names if provided.
       parameters:
         - $ref: '#/components/parameters/SMILESList'
-        - $ref: '#/components/parameters/Name'
+        - $ref: '#/components/parameters/SmileName'
         - $ref: '#/components/parameters/Smarts'
+        - $ref: '#/components/parameters/SmartName'
         - $ref: '#/components/parameters/strict'
         - $ref: '#/components/parameters/exclude_mol_props'
       responses:
@@ -206,9 +219,33 @@ paths:
               example:
                 [
                   {
-                    "SMILES": "OC(c1ccccc1)c1nc2ccccc2[nH]1",
-                    "name": "NSC-405"
+                    "n_matches(query_01 = \"[ND1H2]-[ND2]=Cc1c(-[OH1])cccc1\")": 0,
+                    "n_matches(query_02 = \"[!#1]-!@[CD4](-!@[!#1])1C(=O)NC(=S)S1\")": 0,
+                    "n_matches(query_03 = \"[OH]\")": 1,
+                    "name": "quinine",
+                    "smiles": "C=CC1CN2CCC1CC2C(O)c1ccnc2ccc(OC)cc12"
+                  },
+                  {
+                    "n_matches(query_01 = \"[ND1H2]-[ND2]=Cc1c(-[OH1])cccc1\")": 0,
+                    "n_matches(query_02 = \"[!#1]-!@[CD4](-!@[!#1])1C(=O)NC(=S)S1\")": 0,
+                    "n_matches(query_03 = \"[OH]\")": 0,
+                    "name": "caffeine",
+                    "smiles": "Cn1c(=O)c2c(ncn2C)n(C)c1=O"
+                  },
+                  {
+                    "n_matches(query_01 = \"[ND1H2]-[ND2]=Cc1c(-[OH1])cccc1\")": 0,
+                    "n_matches(query_02 = \"[!#1]-!@[CD4](-!@[!#1])1C(=O)NC(=S)S1\")": 0,
+                    "n_matches(query_03 = \"[OH]\")": 0,
+                    "name": "AACFAZ",
+                    "smiles": "COC1=C(C(C)=NN=C(C)C2=C(OC)C(=O)OC2c2ccccc2Cl)C(c2ccccc2Cl)OC1=O"
+                  },
+                  {
+                    "n_matches(query_01 = \"[ND1H2]-[ND2]=Cc1c(-[OH1])cccc1\")": 0,
+                    "n_matches(query_02 = \"[!#1]-!@[CD4](-!@[!#1])1C(=O)NC(=S)S1\")": 0,
+                    "n_matches(query_03 = \"[OH]\")": 0,
+                    "name": "ELAVIL",
+                    "smiles": "CN(C)CCC=C1c2ccccc2CCc2ccccc21"
                   }
-                ]
+              ]
         400:
           $ref: '#/components/responses/ResponseCode400'
