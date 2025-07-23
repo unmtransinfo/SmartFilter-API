@@ -119,6 +119,8 @@ paths:
         - $ref: '#/components/parameters/SmartName'
         - $ref: '#/components/parameters/usa'
         - $ref: '#/components/parameters/exclude_mol_props'
+        - $ref: '#/components/parameters/nonzero_rows'
+
       responses:
         200:
           description: Match counts for each SMILES.

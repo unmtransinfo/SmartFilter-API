@@ -158,7 +158,7 @@ def get_matchcounts():
 
     exclude_mol_props = request.args.get("ExcludeMolProp", type=bool, default=False)
     usa = request.args.get("usa", type=bool, default=False)
-
+    non_zero_rows = request.args.get("nonzero_rows", type=bool, default=False)
     parsed = []
     for smiles, name in zip(smiles_list, names_list):
         mol = Chem.MolFromSmiles(smiles)
@@ -177,6 +177,7 @@ def get_matchcounts():
         molReader=parsed,
         molWriter=collector,
         exclude_mol_props=exclude_mol_props,
+        nonzero_rows=non_zero_rows,
     )
 
     return jsonify(collector.results), 200
@@ -203,24 +204,43 @@ def get_matchfilter():
     exclude_mol_props = request.args.get("ExcludeMolProp", type=bool, default=False)
 
     parsed = []
+    invalid = []
     for smiles, name in zip(smiles_list, names_list):
         mol = Chem.MolFromSmiles(smiles)
         if mol:
             mol.SetProp("_Name", name)
-            parsed.append(mol)
+            parsed.append((name, smiles, mol))
+        else:
+            invalid.append({"name": name, "smiles": ""})
 
-    if not parsed:
+    if not parsed and not invalid:
         return jsonify({"error": "No valid molecules parsed from input"}), 400
 
     collector = MatchFilter()
     smarts.MatchFilter(
         smarts=smart,
-        molReader=parsed,
+        molReader=[mol for _, _, mol in parsed],
         molWriter=collector,
         exclude_mol_props=exclude_mol_props,
     )
 
-    return jsonify(collector.accepted), 200
+    accepted_smiles = set(item['SMILES'] for item in collector.accepted)
+
+    passed = []
+    failed = []
+
+    for name, smiles, mol in parsed:
+        if Chem.MolToSmiles(mol, canonical=True) in accepted_smiles:
+            failed.append({"name": name, "smiles": smiles})
+        else:
+            passed.append({"name": name, "smiles": smiles})
+
+    failed.extend(invalid)
+
+    return jsonify({
+        "passed": passed,
+        "failed": failed
+    }), 200
 
 
 @smarts_filter.route('/get_multi_matchcounts', methods=['GET'])
@@ -271,7 +291,7 @@ def get_multi_matchcounts():
     exclude_mol_props = request.args.get("ExcludeMolProp", type=bool, default=False)
     usa = request.args.get("usa", type=bool, default=False)
     raiseError = request.args.get("strict", type=bool, default=False)
-
+    non_zero_rows = request.args.get("nonzero_rows", type=bool, default=False)
     parsed = []
     for smiles, name in zip(smiles_list, names_list):
         mol = Chem.MolFromSmiles(smiles)
@@ -292,13 +312,13 @@ def get_multi_matchcounts():
         molReader=parsed,
         molWriter=collector,
         exclude_mol_props=exclude_mol_props,
+        nonzero_rows = non_zero_rows
     )
     return jsonify(collector.results), 200
-
 @smarts_filter.route('/get_multi_matchfilter', methods=['GET'])
 def get_multi_matchfilter():
     smiles_list = process_smiles_input(request, "SMILES", 1000)
-    names_list = process_smiles_input(request, "Smile_Names", 1000)  # changed to "Names" to keep consistent
+    names_list = process_smiles_input(request, "Smile_Names", 1000)
 
     if not isinstance(smiles_list, list) or not smiles_list:
         return jsonify({"error": "No SMILES provided"}), 400
@@ -310,7 +330,7 @@ def get_multi_matchfilter():
         names_list = smiles_list
 
     try:
-        smarts_list = process_smiles_input(request, "smarts", 1000)
+        smarts_list = request.args.getlist("smarts")
     except Exception as e:
         return jsonify({"error": str(e)}), 400
 
@@ -348,20 +368,17 @@ def get_multi_matchfilter():
         exclude_mol_props=exclude_mol_props,
     )
 
-    # Collector.accepted contains filtered molecules as dict with 'SMILES' and 'name'
     accepted_smiles = set(item['SMILES'] for item in collector.accepted)
 
     passed = []
     failed = []
 
-    # Check which molecules passed or failed based on SMILES match in accepted set
     for name, smiles, mol in parsed:
         if Chem.MolToSmiles(mol, canonical=True) in accepted_smiles:
-            passed.append({"name": name, "smiles": smiles})
-        else:
             failed.append({"name": name, "smiles": smiles})
+        else:
+            passed.append({"name": name, "smiles": smiles})
 
-    # Add invalid molecules to failed with empty smiles
     failed.extend(invalid)
 
     return jsonify({
