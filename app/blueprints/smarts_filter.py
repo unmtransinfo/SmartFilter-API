@@ -194,21 +194,12 @@ def get_matchcounts():
 def get_matchfilter():
     smiles_list = process_smiles_input(request, "SMILES", 1000)
     names_list = process_smiles_input(request, "Smile_Names", 1000)
-
-    if not isinstance(smiles_list, list) or not smiles_list:
-        return jsonify({"error": "No SMILES provided"}), 400
-
-    if not isinstance(names_list, list) or not names_list:
-        return jsonify({"error": "No Names provided"}), 400
+    smart = process_smarts_input(request)[0]
+    smart_name = request.args.get("Smart_Names", smart)
+    exclude_mol_props = request.args.get("exclude_mol_props", type=bool, default=False)
 
     if len(smiles_list) != len(names_list):
-        return jsonify({"error": f"'SMILES' and 'Names' must be the same length: got {len(smiles_list)} and {len(names_list)}"}), 400
-
-    smart = process_smarts_input(request)[0]
-    if not smart:
-        return jsonify({"error": "Smarts pattern is required"}), 400
-
-    exclude_mol_props = request.args.get("ExcludeMolProp", type=bool, default=False)
+        return jsonify({"error": "SMILES and Names must be same length"}), 400
 
     parsed = []
     invalid = []
@@ -220,35 +211,39 @@ def get_matchfilter():
         else:
             invalid.append({"name": name, "smiles": ""})
 
-    if not parsed and not invalid:
-        return jsonify({"error": "No valid molecules parsed from input"}), 400
-
     collector = MatchFilter()
     smarts.MatchFilter(
         smarts=smart,
         molReader=[mol for _, _, mol in parsed],
         molWriter=collector,
-        exclude_mol_props=exclude_mol_props,
+        exclude_mol_props = exclude_mol_props
     )
 
     accepted_smiles = set(item['SMILES'] for item in collector.accepted)
-
-    passed = []
     failed = []
+    passed = []
+    qmol = Chem.MolFromSmarts(smart)
 
     for name, smiles, mol in parsed:
-        if Chem.MolToSmiles(mol, canonical=True) in accepted_smiles:
-            failed.append({"name": name, "smiles": smiles})
+        canon = Chem.MolToSmiles(mol, canonical=True)
+        matches = mol.GetSubstructMatches(qmol)
+        if canon in accepted_smiles:
+            failed.append({
+                "name": name,
+                "smiles": smiles,
+                "failed": True,
+                "reason": smart_name,
+                "highlight_atoms": [list(m) for m in matches]
+            })
         else:
-            passed.append({"name": name, "smiles": smiles})
+            passed.append({
+                "name": name,
+                "smiles": smiles,
+                "failed": False
+            })
 
     failed.extend(invalid)
-
-    return jsonify({
-        "passed": passed,
-        "failed": failed
-    }), 200
-
+    return jsonify({"passed": passed, "failed": failed}), 200
 
 @smarts_filter.route('/get_multi_matchcounts', methods=['GET'])
 def get_multi_matchcounts():
@@ -322,6 +317,7 @@ def get_multi_matchcounts():
         nonzero_rows = non_zero_rows
     )
     return jsonify(collector.results), 200
+
 @smarts_filter.route('/get_multi_matchfilter', methods=['GET'])
 def get_multi_matchfilter():
     smiles_list = process_smiles_input(request, "SMILES", 1000)
@@ -331,27 +327,28 @@ def get_multi_matchfilter():
         return jsonify({"error": "No SMILES provided"}), 400
 
     if names_list and len(names_list) != len(smiles_list):
-        return jsonify({"error": f"'SMILES' and 'Names' must be the same length: got {len(smiles_list)} and {len(names_list)}"}), 400
+        return jsonify({"error": "'SMILES' and 'Names' must be the same length"}), 400
 
     if not names_list:
         names_list = smiles_list
 
-    try:
-        smarts_list = request.args.getlist("smarts")
-    except Exception as e:
-        return jsonify({"error": str(e)}), 400
+    smarts_list = request.args.getlist("smarts")
+    smart_names = request.args.getlist("Smart_Names")
 
-    if not smarts_list:
-        return jsonify({"error": "No valid SMARTS patterns provided"}), 400
+    if not smarts_list or not smart_names:
+        return jsonify({"error": "Missing SMARTS or Smart_Names"}), 400
 
-    # Write SMARTS patterns to temp file
+    if len(smarts_list) != len(smart_names):
+        return jsonify({"error": "'Smart_Names' and 'smarts' must be the same length"}), 400
+
+    exclude_mol_props = request.args.get("exclude_mol_props", type=bool, default=False)
+    strict = request.args.get("strict", type=bool, default=False)
+
+    # Write SMARTS file for MatchFilterMulti
     with tempfile.NamedTemporaryFile(mode="w+", delete=False) as temp_smarts_file:
         for smarts_pattern in smarts_list:
             temp_smarts_file.write(smarts_pattern.strip() + "\n")
         temp_smarts_file_path = temp_smarts_file.name
-
-    exclude_mol_props = request.args.get("ExcludeMolProp", type=bool, default=False)
-    raiseError = request.args.get("strict", type=bool, default=False)
 
     parsed = []
     invalid = []
@@ -359,17 +356,23 @@ def get_multi_matchfilter():
         mol = Chem.MolFromSmiles(smiles)
         if mol:
             mol.SetProp("_Name", name)
-            parsed.append((name, smiles, mol))  # keep name and smiles for output
+            parsed.append((name, smiles, mol))
         else:
-            invalid.append({"name": name, "smiles": ""})
+            invalid.append({
+                "name": name,
+                "smiles": "",
+                "failed": True,
+                "reason": "Invalid SMILES",
+                "highlight_atoms": []
+            })
 
     if not parsed and not invalid:
-        return jsonify({"error": "No valid molecules parsed from input"}), 400
+        return jsonify({"error": "No valid molecules parsed"}), 400
 
     collector = MatchFilter()
     smarts.MatchFilterMulti(
         smarts_file_path=temp_smarts_file_path,
-        strict_smarts=raiseError,
+        strict_smarts=strict,
         molReader=[mol for _, _, mol in parsed],
         molWriter=collector,
         exclude_mol_props=exclude_mol_props,
@@ -377,18 +380,36 @@ def get_multi_matchfilter():
 
     accepted_smiles = set(item['SMILES'] for item in collector.accepted)
 
-    passed = []
     failed = []
+    passed = []
 
+    # For each molecule, test which SMARTS it failed
     for name, smiles, mol in parsed:
-        if Chem.MolToSmiles(mol, canonical=True) in accepted_smiles:
-            failed.append({"name": name, "smiles": smiles})
+        canon = Chem.MolToSmiles(mol, canonical=True)
+
+        if canon in accepted_smiles:
+            # Failed: find which SMARTS matched (may be more than one)
+            for smarts_pattern, smart_name in zip(smarts_list, smart_names):
+                qmol = Chem.MolFromSmarts(smarts_pattern)
+                if not qmol:
+                    continue
+                matches = mol.GetSubstructMatches(qmol)
+                if matches:
+                    failed.append({
+                        "name": name,
+                        "smiles": smiles,
+                        "failed": True,
+                        "reason": smart_name,
+                        "highlight_atoms": [list(m) for m in matches]
+                    })
+                    break  # stop after first match for same mol
         else:
-            passed.append({"name": name, "smiles": smiles})
+            passed.append({
+                "name": name,
+                "smiles": smiles,
+                "failed": False
+            })
 
     failed.extend(invalid)
 
-    return jsonify({
-        "passed": passed,
-        "failed": failed
-    }), 200
+    return jsonify({"passed": passed, "failed": failed}), 200
