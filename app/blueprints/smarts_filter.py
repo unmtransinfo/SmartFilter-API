@@ -1,6 +1,7 @@
 from flask import Blueprint, request, jsonify
 from rdkit import Chem
 from rdktools import smarts
+from rdkit.Chem import FilterCatalog
 from models import PainsRun, db
 from utils.request_processing import process_smiles_input, process_smarts_input, process_multi_smarts_input
 import tempfile
@@ -78,6 +79,12 @@ class MatchFilter:
             "name": mol.GetProp("_Name") if mol.HasProp("_Name") else "",
         })
 
+# Initialize the PAINS filter catalog once (reuse on every request)
+params = FilterCatalog.FilterCatalogParams()
+params.AddCatalog(FilterCatalog.FilterCatalogParams.FilterCatalogs.PAINS_A)
+params.AddCatalog(FilterCatalog.FilterCatalogParams.FilterCatalogs.PAINS_B)
+params.AddCatalog(FilterCatalog.FilterCatalogParams.FilterCatalogs.PAINS_C)
+catalog = FilterCatalog.FilterCatalog(params)
 
 @smarts_filter.route('/get_filterpains', methods=['GET'])
 def get_filterpains():
@@ -102,41 +109,41 @@ def get_filterpains():
         mol = Chem.MolFromSmiles(smiles)
         if mol:
             mol.SetProp("_Name", name)
-            parsed.append([name, smiles, mol])  # use list, not tuple
+            parsed.append((name, smiles, mol))
         else:
-            invalid.append(name)
+            invalid.append({"name": name, "smiles": ""})
 
     if not parsed:
         return jsonify({"error": "No valid molecules found"}), 400
 
-    collector = MoleculeCollector()
-    mols = [mol for _, _, mol in parsed]
-    exclude_mol_props = request.args.get("ExcludeMolProp", type=bool, default=False)
-
-    smarts.FilterPAINS(mols, collector, exclude_mol_props)
-    accepted_set = set(collector.accepted)
-
-    passed = []
-    failed = []
-
+    results = []
     for name, smiles, mol in parsed:
-        if Chem.MolToSmiles(mol, canonical=True) in accepted_set:
-            passed.append({"name": name, "smiles": smiles})
+        entry = catalog.GetFirstMatch(mol)
+        if entry:
+            description = entry.GetDescription()
+            highlight_atom_sets = []
+            for filter_match in entry.GetFilterMatches(mol):
+                atom_indices = [atom_idx for _, atom_idx in filter_match.atomPairs]
+                highlight_atom_sets.append(atom_indices)
+
+            results.append({
+                "name": name,
+                "smiles": smiles,
+                "failed": True,
+                "reason": description,
+                "highlight_atoms": highlight_atom_sets
+            })
         else:
-            failed.append({"name": name, "smiles": smiles})
+            results.append({
+                "name": name,
+                "smiles": smiles,
+                "failed": False
+            })
 
-    for inv in invalid:
-        failed.append({"name": inv, "smiles": ""})
+    # Add invalid molecules as failed with empty smiles
+    results.extend([{"name": inv["name"], "smiles": "", "failed": True, "reason": "Invalid SMILES", "highlight_atoms": []} for inv in invalid])
 
-    record = PainsRun(inputs=[{"smiles": s} for s in smiles_list], passed=passed, failed=failed)
-    db.session.add(record)
-    db.session.commit()
-
-    return jsonify({
-        "passed": passed,
-        "failed": failed
-    }), 200
-
+    return jsonify(results), 200
 
 @smarts_filter.route('/get_matchcounts', methods=['GET'])
 def get_matchcounts():
