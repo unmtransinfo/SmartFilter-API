@@ -5,6 +5,7 @@ from rdkit.Chem import FilterCatalog
 from models import PainsRun, db
 from utils.request_processing import process_smiles_input, process_smarts_input, process_multi_smarts_input
 import tempfile
+import re
 
 smarts_filter = Blueprint("smarts_filter", __name__, url_prefix="/smarts_filter")
 
@@ -41,29 +42,43 @@ class MatchCountCollector:
 
 class MatchMultiCountCollector:
     def __init__(self, named_smarts):
-        self.named_smarts = named_smarts  # list of (name, smarts)
-        self.results = []
+        self.named_smarts = named_smarts
+        self.results = {}
 
     def SetProps(self, props):
-        self.query_names = []
-        for prop in props:
-            if prop.startswith("n_matches("):
-                self.query_names.append(prop)
+        self.query_names = [p for p in props if p.startswith("n_matches(")]
 
     def write(self, mol):
-        record = {
-            "smiles": Chem.MolToSmiles(mol, canonical=True),
-            "name": mol.GetProp("_Name") if mol.HasProp("_Name") else "",
-        }
+        mol_name = mol.GetProp("_Name") if mol.HasProp("_Name") else ""
+        if mol_name not in self.results:
+            self.results[mol_name] = {}
 
-        for key in self.query_names:
-            print(key)
-            if mol.HasProp(key):
-                record[key] = mol.GetIntProp(key)
+        for prop_name in self.query_names:
+            count = mol.GetIntProp(prop_name) if mol.HasProp(prop_name) else 0
+
+            # Extract what's inside n_matches(...)
+            raw_query = prop_name[len("n_matches("):-1]  # e.g. query_02 = "[OH]"
+
+            # Use regex to extract the SMARTS part inside quotes
+            match = re.search(r'=\s*"(.+)"', raw_query)
+            if match:
+                smarts_pattern = match.group(1)  # This gives just [OH]
             else:
-                record[key] = 0
+                smarts_pattern = raw_query  # fallback
 
-        self.results.append(record)
+            # Map SMARTS pattern to smart name if it exists
+            smart_name = None
+            for pattern, name in self.named_smarts:
+                if pattern == smarts_pattern:
+                    smart_name = name
+                    break
+            if smart_name is None:
+                smart_name = smarts_pattern
+
+            self.results[mol_name][smart_name] = count
+
+
+
 
 
 class MatchFilter:
@@ -111,39 +126,54 @@ def get_filterpains():
             mol.SetProp("_Name", name)
             parsed.append((name, smiles, mol))
         else:
-            invalid.append({"name": name, "smiles": ""})
+            invalid.append({"name": name, "smiles": smiles})
 
     if not parsed:
         return jsonify({"error": "No valid molecules found"}), 400
 
+    # Get all PAINS filters
+    all_pains_filters = []
+    num_entries = catalog.GetNumEntries()
+    for i in range(num_entries):
+        entry = catalog.GetEntry(i)
+        all_pains_filters.append(entry.GetDescription())
+
     results = []
+
     for name, smiles, mol in parsed:
-        entry = catalog.GetFirstMatch(mol)
-        if entry:
-            description = entry.GetDescription()
-            highlight_atom_sets = []
-            for filter_match in entry.GetFilterMatches(mol):
-                atom_indices = [atom_idx for _, atom_idx in filter_match.atomPairs]
-                highlight_atom_sets.append(atom_indices)
+        reasons = []
+        highlight_atom_sets = []
 
-            results.append({
-                "name": name,
-                "smiles": smiles,
-                "failed": True,
-                "reason": description,
-                "highlight_atoms": highlight_atom_sets
-            })
-        else:
-            results.append({
-                "name": name,
-                "smiles": smiles,
-                "failed": False
-            })
+        try:
+            matched_entries = catalog.GetMatches(mol)
+            for entry in matched_entries:
+                reasons.append(entry.GetDescription())
 
-    # Add invalid molecules as failed with empty smiles
-    results.extend([{"name": inv["name"], "smiles": "", "failed": True, "reason": "Invalid SMILES", "highlight_atoms": []} for inv in invalid])
+                try:
+                    matches = entry.GetFilterMatches(mol)
+                    for match in matches:
+                        atom_indices = [atom_idx for _, atom_idx in match.atomPairs]
+                        if atom_indices:
+                            highlight_atom_sets.append(atom_indices)
+                except Exception as match_err:
+                    print(f"[Match Error] {entry.GetDescription()} on '{name}': {match_err}")
+        except Exception as e:
+            print(f"[Catalog Match Error] Failed on molecule '{name}': {e}")
 
-    return jsonify(results), 200
+        results.append({
+            "name": name,
+            "smiles": smiles,
+            "failed": bool(reasons),
+            "reasons": reasons,
+            "highlight_atoms": highlight_atom_sets
+        })
+
+    return jsonify({
+        "results": results,
+        "all_pains_filters": all_pains_filters,
+        "invalid": invalid
+    }), 200
+
 
 @smarts_filter.route('/get_matchcounts', methods=['GET'])
 def get_matchcounts():
@@ -255,7 +285,7 @@ def get_multi_matchcounts():
 
     if names_list and len(names_list) != len(smiles_list):
         return jsonify({
-            "error": f"'SMILES' and 'Names' must be the same length: got {len(smiles_list)} and {len(names_list)}"
+            "error": f"'SMILES' and 'Smile_Names' must be the same length: got {len(smiles_list)} and {len(names_list)}"
         }), 400
 
     if not names_list:
@@ -270,30 +300,24 @@ def get_multi_matchcounts():
     if not smarts_list or not smart_names:
         return jsonify({"error": "Missing SMARTS patterns or Smart_Names"}), 400
 
-    print(smarts_list, smart_names)
     if len(smarts_list) != len(smart_names):
         return jsonify({
             "error": f"'Smart_Names' and 'smarts' must be the same length: got {len(smart_names)} and {len(smarts_list)}"
         }), 400
 
-    # Zip name and pattern
     named_smarts = list(zip(smarts_list, smart_names))
-    # Write SMARTS only to file (not names)
+
+    # Write SMARTS and names to temporary file
     with tempfile.NamedTemporaryFile(mode="w+", delete=False) as temp_smarts_file:
         for pattern, name in named_smarts:
             temp_smarts_file.write(f"{pattern} {name}\n")
         temp_smarts_file_path = temp_smarts_file.name
 
-    # Now read and print the file contents
-    with open(temp_smarts_file_path, 'r') as f:
-        print("Temp SMARTS file content:")
-        print(f.read())
-
-
     exclude_mol_props = request.args.get("ExcludeMolProp", type=bool, default=False)
     usa = request.args.get("usa", type=bool, default=False)
     raiseError = request.args.get("strict", type=bool, default=False)
-    non_zero_rows = request.args.get("nonzero_rows", type=bool, default=False)
+    nonzero_rows = request.args.get("nonzero_rows", type=bool, default=False)
+    # Parse molecules
     parsed = []
     for smiles, name in zip(smiles_list, names_list):
         mol = Chem.MolFromSmiles(smiles)
@@ -304,9 +328,9 @@ def get_multi_matchcounts():
     if not parsed:
         return jsonify({"error": "No valid molecules parsed from input"}), 400
 
-    # Custom collector to tag match counts with SMARTS names
+    # Run the match counts
     collector = MatchMultiCountCollector(named_smarts)
-
+    
     smarts.MatchCountsMulti(
         smarts_file_path=temp_smarts_file_path,
         strict_smarts=raiseError,
@@ -314,9 +338,30 @@ def get_multi_matchcounts():
         molReader=parsed,
         molWriter=collector,
         exclude_mol_props=exclude_mol_props,
-        nonzero_rows = non_zero_rows
+        nonzero_rows=nonzero_rows
     )
-    return jsonify(collector.results), 200
+    results = []
+    for i, mol in enumerate(parsed):
+        mol_name = mol.GetProp("_Name")
+        result = {
+            "name": mol_name,
+            "smiles": smiles_list[i],
+            "matches": []
+        }
+
+        for pattern, name in named_smarts:
+            count = collector.results.get(mol_name, {}).get(name, 0)
+            result["matches"].append({
+                "smarts": pattern,
+                "name": name,
+                "count": count
+            })
+
+        results.append(result)
+
+
+    return jsonify(results), 200
+
 
 @smarts_filter.route('/get_multi_matchfilter', methods=['GET'])
 def get_multi_matchfilter():
