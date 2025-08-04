@@ -58,22 +58,36 @@ components:
       explode: true
       description: Takes one or more SMARTS strings (comma-separated or repeated).
 
+    IsoMericSmiles:
+      name: isomericSmiles
+      in: query
+      type: boolean
+      required: false
+      description: Return isomeric SMILES
+
+    KekuleSmiles:
+      name: kekuleSmiles
+      in: query
+      type: boolean
+      required: false
+      description: Return kekule SMILES
+
     usa:
-      name: Unique Set-of-Atoms
+      name: unique_set
       in: query
       type: boolean
       required: false
       description: Unique Set-of-Atoms Match Counts
 
     nonzero_rows:
-      name: Only Include Rows
+      name: only_rows
       in: query
       type: boolean
       required: false
       description: Only include rows (i.e., molecules) with at least one match in output
 
     strict:
-      name: Raise Error
+      name: strict_error
       in: query
       type: boolean
       required: false
@@ -180,6 +194,8 @@ paths:
         - $ref: '#/components/parameters/SMILESList'
         - $ref: '#/components/parameters/SmileName'
         - $ref: '#/components/parameters/Smarts'
+        - $ref: '#/components/parameters/IsoMericSmiles'
+        - $ref: '#/components/parameters/KekuleSmiles'
         - $ref: '#/components/parameters/SmartName'
         - $ref: '#/components/parameters/usa'
         - $ref: '#/components/parameters/strict'
