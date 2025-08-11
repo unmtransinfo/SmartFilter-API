@@ -112,10 +112,66 @@ paths:
         200:
           description: A JSON object containing all compounds and their associated tests either passed or failed.
           examples:
-            application/json:
+            application/json: |
               {
-                "failed": ["O=C1NC(=O)C(=Cc2ccc(C=C3C(=O)NC(=O)NC3=O)cc2)C(=O)N1"],
-                "passed": ["COc1cc2c(ccnc2cc1)C(O)C4CC(CC3)C(C=C)CN34"]
+                "all_pains_filters": [
+                  "ene_six_het_A(483)",
+                  "hzone_phenol_A(479)",
+                  "anil_di_alk_A(478)",
+                  "..."
+                ],
+                "invalid": [],
+                "results": [
+                  {
+                    "failed": false,
+                    "highlight_atoms": [],
+                    "name": "NSC-2066",
+                    "reasons": [],
+                    "smiles": "c1(=O)c2c(n(c(=O)n1C)C)nc[nH]2"
+                  },
+                  {
+                    "failed": true,
+                    "highlight_atoms": [
+                      [
+                        5,
+                        3,
+                        2,
+                        1,
+                        16,
+                        14,
+                        15,
+                        4,
+                        6
+                      ]
+                    ],
+                    "name": "0326-0519",
+                    "reasons": [
+                      "ene_six_het_A(483)"
+                    ],
+                    "smiles": "O=C1NC(=O)C(=Cc2ccc(Cl)cc2)C(=O)N1"
+                  },
+                  {
+                    "failed": true,
+                    "highlight_atoms": [
+                      [
+                        8,
+                        6,
+                        5,
+                        3,
+                        2,
+                        1,
+                        0,
+                        7,
+                        9
+                      ]
+                    ],
+                    "name": "0327-0360",
+                    "reasons": [
+                      "ene_six_het_A(483)"
+                    ],
+                    "smiles": "O=C1NC(=S)NC(=O)C1=Cc1ccc(Cl)cc1"
+                  }
+                ]
               }
         400:
           $ref: '#/components/responses/ResponseCode400'
@@ -139,19 +195,24 @@ paths:
         200:
           description: Match counts for each SMILES.
           examples:
-            application/json:
-              [
+            application/json: |
+             {[
                 {
-                  "n_matches": 1,
-                  "name": "quinine",
-                  "smiles": "C=CC1CN2CCC1CC2C(O)c1ccnc2ccc(OC)cc12"
+                  "n_matches": 2,
+                  "name": "0365-0123",
+                  "smiles": "O=C1NC(=O)C(=Cc2ccc(C=C3C(=O)NC(=O)NC3=O)cc2)C(=O)N1"
                 },
                 {
                   "n_matches": 0,
-                  "name": "caffeine",
-                  "smiles": "Cn1c(=O)c2c(ncn2C)n(C)c1=O"
+                  "name": "NSC-4624",
+                  "smiles": "O=C(O)c1nc(N=Nc2ccc(S(=O)(=O)O)cc2)[nH]c1C(=O)O"
+                },
+                {
+                  "n_matches": 1,
+                  "name": "0606-5831",
+                  "smiles": "CCCCCCCCOc1ccc(C=C2C(=O)NC(=O)NC2=O)cc1"
                 }
-              ]
+              ]}
         400:
           $ref: '#/components/responses/ResponseCode400'
 
@@ -171,16 +232,70 @@ paths:
         200:
           description: List of each SMILES and names matching the multi SMARTS.
           examples:
-            application/json:
-              example:
-                {
-                "example": [
-                  {
-                    "SMILES": "OC(c1ccccc1)c1nc2ccccc2[nH]1",
-                    "name": "NSC-405"
-                  }
-                ]
-              }
+            application/json: |
+              {
+                  "failed": [
+                    {
+                      "failed": true,
+                      "highlight_atoms": [
+                        [
+                          0,
+                          1,
+                          2,
+                          3,
+                          4,
+                          5,
+                          6,
+                          23,
+                          24,
+                          25
+                        ],
+                        [
+                          17,
+                          16,
+                          15,
+                          13,
+                          14,
+                          12,
+                          11,
+                          19,
+                          20,
+                          18
+                        ]
+                      ],
+                      "name": "0365-0123",
+                      "reason": "ene_six_het_A",
+                      "smiles": "O=C1NC(=O)C(=Cc2ccc(C=C3C(=O)NC(=O)NC3=O)cc2)C(=O)N1"
+                    },
+                    {
+                      "failed": true,
+                      "highlight_atoms": [
+                        [
+                          19,
+                          18,
+                          17,
+                          15,
+                          16,
+                          14,
+                          13,
+                          21,
+                          22,
+                          20
+                        ]
+                      ],
+                      "name": "0606-5831",
+                      "reason": "ene_six_het_A",
+                      "smiles": "CCCCCCCCOc1ccc(C=C2C(=O)NC(=O)NC2=O)cc1"
+                    }
+                  ],
+                  "passed": [
+                    {
+                      "failed": false,
+                      "name": "NSC-4624",
+                      "smiles": "[nH]1c(nc(c1C(=O)O)C(=O)O)N=Nc2ccc(cc2)S(=O)(=O)O"
+                    }
+                  ]
+                }
         400:
           $ref: '#/components/responses/ResponseCode400'
 
@@ -205,12 +320,135 @@ paths:
         200:
           description: Match counts per compound.
           examples:
-            application/json:
+            application/json: |
               [
                 {
-                  "n_matches": 4,
-                  "name": "GL-1566",
-                  "smiles": "O=C(O)c1nnn(...)c1C(=O)O"
+                  "matches": [
+                    {
+                      "count": 2,
+                      "highlight_atoms": [
+                        [
+                          0,
+                          1,
+                          2,
+                          3,
+                          4,
+                          5,
+                          6,
+                          23,
+                          24,
+                          25
+                        ],
+                        [
+                          17,
+                          16,
+                          15,
+                          13,
+                          14,
+                          12,
+                          11,
+                          19,
+                          20,
+                          18
+                        ]
+                      ],
+                      "name": "ene_six_het_A",
+                      "smarts": "[O,S]=C1[NH1]C(=O)C(=C)C(=O)[NH1]1"
+                    },
+                    {
+                      "count": 0,
+                      "highlight_atoms": [],
+                      "name": "hzone_phenol_A",
+                      "smarts": "[ND1H2]-[ND2]=Cc1c(-[OH1])cccc1"
+                    },
+                    {
+                      "count": 0,
+                      "highlight_atoms": [],
+                      "name": "ene_five_het_D",
+                      "smarts": "[C!R]=C1C(=O)NNC1=O"
+                    },
+                    {
+                      "count": 0,
+                      "highlight_atoms": [],
+                      "name": "anil_alk_ene",
+                      "smarts": "C1C=CC2C1CNc1ccccc21"
+                    }
+                  ],
+                  "name": "0365-0123",
+                  "smiles": "O=C1NC(=O)C(=Cc2ccc(C=C3C(=O)NC(=O)NC3=O)cc2)C(=O)N1"
+                },
+                {
+                  "matches": [
+                    {
+                      "count": 0,
+                      "highlight_atoms": [],
+                      "name": "ene_six_het_A",
+                      "smarts": "[O,S]=C1[NH1]C(=O)C(=C)C(=O)[NH1]1"
+                    },
+                    {
+                      "count": 0,
+                      "highlight_atoms": [],
+                      "name": "hzone_phenol_A",
+                      "smarts": "[ND1H2]-[ND2]=Cc1c(-[OH1])cccc1"
+                    },
+                    {
+                      "count": 0,
+                      "highlight_atoms": [],
+                      "name": "ene_five_het_D",
+                      "smarts": "[C!R]=C1C(=O)NNC1=O"
+                    },
+                    {
+                      "count": 0,
+                      "highlight_atoms": [],
+                      "name": "anil_alk_ene",
+                      "smarts": "C1C=CC2C1CNc1ccccc21"
+                    }
+                  ],
+                  "name": "NSC-4624",
+                  "smiles": "O=C(O)c1nc(N=Nc2ccc(S(=O)(=O)O)cc2)[nH]c1C(=O)O"
+                },
+                {
+                  "matches": [
+                    {
+                      "count": 1,
+                      "highlight_atoms": [
+                        [
+                          19,
+                          18,
+                          17,
+                          15,
+                          16,
+                          14,
+                          13,
+                          21,
+                          22,
+                          20
+                        ]
+                      ],
+                      "name": "ene_six_het_A",
+                      "smarts": "[O,S]=C1[NH1]C(=O)C(=C)C(=O)[NH1]1"
+                    },
+                    {
+                      "count": 0,
+                      "highlight_atoms": [],
+                      "name": "hzone_phenol_A",
+                      "smarts": "[ND1H2]-[ND2]=Cc1c(-[OH1])cccc1"
+                    },
+                    {
+                      "count": 0,
+                      "highlight_atoms": [],
+                      "name": "ene_five_het_D",
+                      "smarts": "[C!R]=C1C(=O)NNC1=O"
+                    },
+                    {
+                      "count": 0,
+                      "highlight_atoms": [],
+                      "name": "anil_alk_ene",
+                      "smarts": "C1C=CC2C1CNc1ccccc21"
+                    }
+                  ],
+                  "name": "0606-5831",
+                  "smiles": "CCCCCCCCOc1ccc(C=C2C(=O)NC(=O)NC2=O)cc1"
                 }
               ]
         400:
@@ -233,37 +471,69 @@ paths:
         200:
           description: Matched SMILES with optional names.
           examples:
-            application/json:
-              example:
-                [
+            application/json: |
+              {
+                "failed": [
                   {
-                    "n_matches(query_01 = \"[ND1H2]-[ND2]=Cc1c(-[OH1])cccc1\")": 0,
-                    "n_matches(query_02 = \"[!#1]-!@[CD4](-!@[!#1])1C(=O)NC(=S)S1\")": 0,
-                    "n_matches(query_03 = \"[OH]\")": 1,
-                    "name": "quinine",
-                    "smiles": "C=CC1CN2CCC1CC2C(O)c1ccnc2ccc(OC)cc12"
+                    "failed": true,
+                    "highlight_atoms": [
+                      [
+                        0,
+                        1,
+                        2,
+                        3,
+                        4,
+                        5,
+                        6,
+                        23,
+                        24,
+                        25
+                      ],
+                      [
+                        17,
+                        16,
+                        15,
+                        13,
+                        14,
+                        12,
+                        11,
+                        19,
+                        20,
+                        18
+                      ]
+                    ],
+                    "name": "0365-0123",
+                    "reason": "ene_six_het_A",
+                    "smiles": "O=C1NC(=O)C(=Cc2ccc(C=C3C(=O)NC(=O)NC3=O)cc2)C(=O)N1"
                   },
                   {
-                    "n_matches(query_01 = \"[ND1H2]-[ND2]=Cc1c(-[OH1])cccc1\")": 0,
-                    "n_matches(query_02 = \"[!#1]-!@[CD4](-!@[!#1])1C(=O)NC(=S)S1\")": 0,
-                    "n_matches(query_03 = \"[OH]\")": 0,
-                    "name": "caffeine",
-                    "smiles": "Cn1c(=O)c2c(ncn2C)n(C)c1=O"
-                  },
-                  {
-                    "n_matches(query_01 = \"[ND1H2]-[ND2]=Cc1c(-[OH1])cccc1\")": 0,
-                    "n_matches(query_02 = \"[!#1]-!@[CD4](-!@[!#1])1C(=O)NC(=S)S1\")": 0,
-                    "n_matches(query_03 = \"[OH]\")": 0,
-                    "name": "AACFAZ",
-                    "smiles": "COC1=C(C(C)=NN=C(C)C2=C(OC)C(=O)OC2c2ccccc2Cl)C(c2ccccc2Cl)OC1=O"
-                  },
-                  {
-                    "n_matches(query_01 = \"[ND1H2]-[ND2]=Cc1c(-[OH1])cccc1\")": 0,
-                    "n_matches(query_02 = \"[!#1]-!@[CD4](-!@[!#1])1C(=O)NC(=S)S1\")": 0,
-                    "n_matches(query_03 = \"[OH]\")": 0,
-                    "name": "ELAVIL",
-                    "smiles": "CN(C)CCC=C1c2ccccc2CCc2ccccc21"
+                    "failed": true,
+                    "highlight_atoms": [
+                      [
+                        19,
+                        18,
+                        17,
+                        15,
+                        16,
+                        14,
+                        13,
+                        21,
+                        22,
+                        20
+                      ]
+                    ],
+                    "name": "0606-5831",
+                    "reason": "ene_six_het_A",
+                    "smiles": "CCCCCCCCOc1ccc(C=C2C(=O)NC(=O)NC2=O)cc1"
                   }
-              ]
+                ],
+                "passed": [
+                  {
+                    "failed": false,
+                    "name": "NSC-4624",
+                    "smiles": "[nH]1c(nc(c1C(=O)O)C(=O)O)N=Nc2ccc(cc2)S(=O)(=O)O"
+                  }
+                ]
+              }
         400:
           $ref: '#/components/responses/ResponseCode400'

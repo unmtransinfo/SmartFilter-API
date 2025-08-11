@@ -1,7 +1,6 @@
 import yaml
 from blueprints.version import register_routes
 from config import Config
-from models import db
 from flasgger import LazyJSONEncoder, Swagger
 from flask import Flask
 from flask_cors import CORS
@@ -17,7 +16,6 @@ def create_app():
 
     app.config.from_object(Config)
 
-    db.init_app(app)
 
     # load swagger template
     swagger_template = _load_api_spec()

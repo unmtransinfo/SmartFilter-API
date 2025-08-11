@@ -2,10 +2,8 @@ from flask import Blueprint, request, jsonify
 from rdkit import Chem
 from rdktools import smarts
 from rdkit.Chem import FilterCatalog
-from models import PainsRun, db
-from utils.request_processing import process_smiles_input, process_smarts_input, process_multi_smarts_input
+from utils.request_processing import process_smiles_input, process_smarts_input
 import tempfile
-import re
 
 smarts_filter = Blueprint("smarts_filter", __name__, url_prefix="/smarts_filter")
 
