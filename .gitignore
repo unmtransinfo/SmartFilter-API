@@ -3,7 +3,7 @@ __pycache__/
 *$py.class
 
 *.so
-
+app/.env
 out.log
 out3.log
 pains.db
