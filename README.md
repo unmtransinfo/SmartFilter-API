@@ -1,7 +1,5 @@
 # SmartFilter-API
-API for filtering and matching molecules using SMARTS patterns.
-This repo is under active development.
-
+API code for SmartsFilter Flasgger Docs.
 ## Requirements
 
 * Docker
