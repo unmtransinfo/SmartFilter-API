@@ -7,6 +7,13 @@ This repo is under active development.
 * Docker
 * Docker Compose
 
+## Documentation
+The /apidocs/ page will provide you with detailed information on every API call available.
+
+See links below for documentation on the production and local version of the API:
+* Production: https://chiltepin.health.unm.edu/smartsfilter/apidocs/
+* Local: http://localhost:8000/apidocs/
+
 ## Setup (Development)
 1. git clone https://github.com/yourusername/SmartFilter-API.git
 2. cd SmartFilter-API
@@ -14,6 +21,21 @@ This repo is under active development.
 4. Edit the `.env` credentials as needed
 5. Run `docker-compose --env-file ./app/.env -f compose-development.yml up --build`
 6. A full set of Swagger documentation can be found at http://localhost:8000/apidocs
+
+## Setup (Production on Chiltepin)
+1. Copy `.env.example` to `.env`
+2. Fill in/edit the `.env` credentials as needed
+3. Update apache2 config:
+   - Create a new file for apache2 config: `/etc/apache2/sites-available/smartsfilterapi.conf`
+   - Add the following line to `/etc/apache2/apache2.conf`:
+     ```
+     Include /etc/apache2/sites-available/smartsfilterapi.conf
+     ```
+   - Update the apache2 virtual config file: `/etc/apache2/sites-enabled/000-default.conf`
+   - Run config check: `sudo apachectl configtest`
+   - (If config check passed) reload apache: `sudo systemctl reload apache2`
+4. (If server was previously up): `docker-compose --env-file app/.env -f compose-production.yml down`
+5. Run `docker-compose --env-file app/.env -f compose-production.yml up --build -d`
 
 ## API Endpoints
 1. /get_matchcounts
