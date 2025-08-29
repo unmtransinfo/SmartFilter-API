@@ -8,5 +8,5 @@ APP_URL = environ.get("APP_URL") or "localhost"
 URL_PREFIX = environ.get("URL_PREFIX") or ""
 
 class Config:
-    SQLALCHEMY_DATABASE_URI = os.getenv("DATABASE_URL", "sqlite:///pains.db")
-    SQLALCHEMY_TRACK_MODIFICATIONS = False
+
+    APPLICATION_ROOT = f"/{URL_PREFIX}" if URL_PREFIX else "/"

@@ -63,24 +63,3 @@ def process_smarts_input(request, param_name: str = "smarts") -> list[str]:
 
     return valid_smarts 
 
-def process_multi_smarts_input(request, param_name: str = "smarts", limit: int = 1000) -> list[str]:
-
-    smarts_raw = request.args.get(param_name, default="", type=str).strip()
-    if not smarts_raw:
-        raise ValueError(f"No {param_name} provided")
-
-    print(smarts_raw)
-    smarts_list = re.split(r"[,\s]+", smarts_raw)
-    # smarts_list = [s.strip() for s in smarts_list if s.strip()]
-
-    if len(smarts_list) > limit:
-        raise ValueError(f"Too many {param_name} patterns (limit {limit})")
-
-    valid_smarts = []
-    for s in smarts_list:
-        if Chem.MolFromSmarts(s) is None:
-            raise ValueError(f"Invalid SMARTS: {s}")
-        valid_smarts.append(s)
-
-    return valid_smarts
-
