@@ -14,6 +14,19 @@ services:
     networks:
       - smartsfilter_net
 
+  smartsfilter_ui:
+    build:
+      context: https://github.com/unmtransinfo/Badapple2-UI.git#main
+    environment:
+      - NODE_OPTIONS=--openssl-legacy-provider
+    env_file:
+      - .env
+    command: npx vite build
+    volumes:
+      - static_files_badapple:/app/dist/
+    networks:
+      - badapple_frontend
+
   smartfilter_nginx:
     restart: always
     image: nginx:1
