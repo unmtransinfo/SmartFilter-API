@@ -6,7 +6,7 @@ services:
       dockerfile: Dockerfile
     restart: always
     env_file:
-      - ./app/.env
+      - .env
     environment:
       - APP_PORT=${APP_PORT}
     volumes:
@@ -21,11 +21,10 @@ services:
       - NODE_OPTIONS=--openssl-legacy-provider
     env_file:
       - .env
-    command: npx vite build
     volumes:
-      - static_files_badapple:/app/dist/
+      - static_files_smartsfilter:/app/build/
     networks:
-      - badapple_frontend
+      - smartsfilter_net
 
   smartfilter_nginx:
     restart: always
@@ -36,12 +35,13 @@ services:
       - ./nginx.conf:/etc/nginx/nginx.conf:ro
       - nginx:/etc/nginx
     ports:
-      - "${SMARTSFILTER_NGINX_SSL_PORT:-443}:443"
-      - "${SMARTSFILTER_NGINX_HTTP_PORT:-80}:80"
+      - "8444:80"
     networks:
       - smartsfilter_net
     depends_on:
       smartsfilter_api:
+        condition: service_started
+      smartsfilter_ui:
         condition: service_started
 
 networks:
